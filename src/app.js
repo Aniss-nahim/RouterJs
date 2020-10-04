@@ -7,8 +7,4 @@ route.get('/home', function(res) { render(res); });
 
 route.get('/foo', function(res) { render(res); });
 
-
-window.onload = function(){
-    route.watch();
-}
-
+console.log(route);

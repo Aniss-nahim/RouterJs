@@ -76,7 +76,7 @@ Router.prototype.getRoute = function(path){
 Router.prototype.watch = function(){
     // get the bady container
     let app = document.getElementById('app');
-    // store the current instace route ( can be avoid with arrow function )
+    // store the current instace route ( can be avoid with arrow functions or bind method )
     const self = this;
     // Event delegation
     app.addEventListener('click', function(e){
@@ -134,4 +134,9 @@ Router.prototype.routeList = function(){
 function render(content){
     let layout = document.getElementById('app-content');
     layout.innerHTML = content;
+}
+
+// satrt watching route events
+window.onload = function(){
+    route.watch();
 }
