@@ -1,100 +1,216 @@
 /*****************************************************
- * 
- * @license MIT
+ *  @license MIT
  * @author Nahim Aniss
  * @version 1.0.0
  * All rights recived 2020
  * This file can't be used with out a giving license
  * ---------------------------------------------------
- * Router API manage routes and satats and making 
- * SPA more easy to build
+ * Router API manage routes, stats and history
+ * all to make SPA more easy to build
  *****************************************************/
+'use-strict';
+const Router = (function(){
+   
+    /**********************************************************
+     * TreeRoute with multipl child NoudeRoute for managing routes
+     * This Api TreeRoute build with URL Api and Map Api
+     **********************************************************/
 
-/**
- * Router Object Definition
- * @param {string} host - representing the url origin of the application 
- */
+    /**
+     * Route class constructor 
+     * @param {String} url
+     * @param {String} method Get | Post | put | Delete
+     * @param {Function} action
+     * @return {Route}
+     */
+    const Route = function (url, method=null, action=null){
+        this.url = new URL(url);
+        this.methods = {};
+        if(typeof method === 'string' && method !== ''){
+            this.methods[method] = action;   
+            console.log(method);
+        }
+    }
 
-const Router = function(host){
-    this.tree = new Tree(host);
-}
+    /**
+     * NodeRoute class constructor
+     * a nodeRoute object can have multipl childs but only one father
+     * Each nodeRoute containes a route object describing the route
+     * @param {String} url
+     * @param {String} method
+     * @param {Function} action
+     * @return {NodeRoute}
+     */
+    const NodeRoute = function(url, method=null, action=null){
+        Route.call(this, url, method, action);
+        this.children = new Map();
+    }
 
-/**
- *  Send request to the nodeRoute path
- *  Call the action nodeRoute or resolve and display error on reject
- *  This function is only available in the Router Object
- *  @param {nodeRoute} route - nodeRoute Object
- */
+    /**
+     * Tree class constructor
+     * @param {String} host - the host is the origin adresse server
+     * @param {String} rootMethod
+     * @param {Function} rootAction
+     * @return {Tree}
+     */
+    const Tree = function(host, rootMethod, rootAction){
+        this.host = host;
+        this.root = new NodeRoute(host, rootMethod, rootAction);
+    }
+    
+    /**
+     * Takes a URL and splic the pathname
+     * @param {String} path
+     * @return {Array}
+     */
+    Tree.prototype.splitPath = function(path){
+        // clean pathname by removing / from the start and the end, returned string is insensitive case
+        let cleanPathname = path.replace(/\/+/g,'/');
+        cleanPathname = cleanPathname.replace(/^\/|\/$/g,'').toLowerCase();
+        // splic the cleeanPathname
+        return cleanPathname.split('/');
+    }
 
-Router.fetchRoute = function(route){
-    // Set the url we want to fectch
-    // This instruction is hard coded and it will be removed 
-    // when the back-end is build
-    const urlToFetch = route.data.url.origin+'/src/pages'+route.data.url.pathname+'.html';
+    /**
+     * Register new NodeRoute
+     * @param {Route} route - data route object
+     */
+    Tree.prototype.register = function ( route ){
+        // get the steps from the URL pathname
+        let steps = this.splitPath(route.url.pathname);
+        let shiftedSteps = '';
+        // set the stating node
+        let currentNode = this.root;
+        // while the node exists we move forward
+        while(currentNode.children.has(steps[0])){
+            currentNode = currentNode.children.get(steps[0]);
+            shiftedSteps = '/' + steps.shift();
+        }
+        // if we still have steps then
+        if(steps.length){
+            // Loop through the remaning steps and create nodeRoutes with undefined route
+            steps.forEach(function(step){
+                shiftedSteps = '/' + steps.shift();
+                // create and add node with null data 
+                let newNode = new NodeRoute(this.host+shiftedSteps);
+                currentNode.children.set(step,newNode);
+                currentNode = newNode;
+            });
+            currentNode.route = route;
+        }
+    }
 
-    // send the appropriate request to the server  using the appropriate method
-    http[route.data.method](urlToFetch)
-    .then(response => response.text())
-    .then(content => { 
-        // call the appropriate action when content is recived
-        route.data.action(content); 
-    }).catch(err => console.log(err));
-}
+    /**
+     * Find NodeRoute in the Tree
+     * @param {String} path pathname
+     * @return {NodeRoute} NodeRoute node exists false if not
+     */
+    Tree.prototype.find = function(path){
+        // strating node
+        let currentNode = this.root;
+        // Array steps
+        let steps = Tree.splitPath(path);
+        // looping on steps
+        for(let index in steps){
+            if(!currentNode.children.has(steps[index])){
+                return false;
+            }
+            currentNode = currentNode.children.get(steps[index]);
+        }
+        // node routes with null data are not valide ones
+        return currentNode.method ? currentNode:false;
+    }
 
-// Creating instance of Router
-let route = new Router('http://127.0.0.1:5500/');
+    /*----------------------------------------------------------------------------------------------------*/
 
-/**
- * Subscribe new route, accessible only with GET request
- * @param {pathName , callback}
- */
+    /**
+     * Router class constructor
+     * @param {String} host - representing the url origin of the application
+     * @param {String} rootMethod
+     * @param {Function} rootAction
+     */
+    const Router = function(host, rootMethod, rootAction){
+        Tree.call(this, host, rootMethod, rootAction);
+    }
+    Object.setPrototypeOf(Router, Tree.prototype);
 
-Router.prototype.get = function (pathName, callback){
-    this.tree.add({
-        url    : new URL(this.tree.root.data.url.origin + pathName),
-        method : 'get',
-        action : callback
-    });
-}
+    // Hold the singleton instance of Router class
+    let router = new Router(location.origin, null, null);
+    console.log(router);
 
-/**
- * Get a subscrubed route by giving his path
- * @param {String} path - registred pathname
- * @return {nodeRoute} - false if the route dosen't exist
- */
+    /**
+     * Subscribe new route, accessible only with GET method
+     * @param {string} pathName
+     * @param {string} method
+     * @param {function} callback
+     */
+    Router.prototype.get = function (pathName, callback){
+        this.register(new Route(this.host+pathName, 'get', callback));
+    }
 
-Router.prototype.getRoute = function(path){
-    return this.tree.find(path);
-}
+    /**
+     * Get a subscrubed route by giving his path
+     * @param {String} path - registred pathname
+     * @return {NodeRoute} - false if the route dosen't exist
+     */
+    Router.prototype.getRoute = function(path){
+        return this.find(path);
+    }
 
-/**
- *  The watch method handels the routing process 
- *  getRoute then fetchRoute + showContent
- *  and keeps track of the histoy state
- *  if the route dosen't exist it will display NOT FOUND page
- */
-Router.prototype.watch = function(){
+    /**
+     *  Send request to the NodeRoute path
+     *  Call the action nodeRoute on resolve and display error on reject
+     *  @param {NodeRoute} route - nodeRoute Object
+     */
+    Router.prototype.fetchRoute = function(nodeRoute, fetchMethod){
+        // Set the url we want to fectch
+        // This instruction is hard coded and it will be removed 
+        const urlToFetch = nodeRoute.url.origin+'/src/pages'+nodeRoute.url.pathname+'.html';
+        // check if the nodeRoute support the method
+        if(typeof nodeRoute.methods[fetchMethod] === 'function'){
+            // send the appropriate request to the server  using the appropriate method
+            http[nodeRoute.methods[fetchMethod]](urlToFetch)
+            .then(response => response.text())
+            .then(content => { 
+                // call the appropriate action when content is recived
+                nodeRoute.methods[fetchMethod](content); 
+            }).catch(err => console.log(err));
+        }else{
+            console.error(nodeRoute.url.pathname + " : Doesn't support "+fetchMethod+" method");
+        }
+    }
+
+    /**
+     * DOM manipulation
+     */
     // get the bady container
-    let app = document.getElementById('app');
-    // store the current instace route ( can be avoid with arrow functions or bind method )
-    const self = this;
-    // Event delegation
-    app.addEventListener('click', function(e){
-        e.preventDefault();
-        // check if the clicked element has a route attribute
+    const app = document.getElementById('app');
+
+    /**
+     * Event hundler
+     */
+    app.addEventListener('click', changeRoute);
+    window.addEventListener('popstate', backInHistory);
+
+
+    /**
+     * Event functions 
+     */
+    // these two function hundl the app state and history
+    function changeRoute(event){
+        event.preventDefault();
         if(e.target.getAttribute('route')){
-            // get the selected path
+
             const selectedPath = e.target.getAttribute('route');
-            // get the appropiate nodeRoute of the selected path
-            const selectedRoute = self.getRoute(selectedPath);
-            //console.log(self.getRoute(selectedPath));
-            if(selectedRoute){
+            const selectedNodeRoute = router.getRoute(selectedPath);
+
+            if(selectedNodeRoute){
                 // fetch route and returns response
-                Router.fetchRoute(selectedRoute);
+                router.fetchRoute(selectedNodeRoute);
                 // set the stateObject for the next history
-                const stateObj = { path : selectedRoute.data.url.pathname };
+                const stateObj = { path : selectedNodeRoute.url.pathname };
                 // push the new state to the brawser session history stack 
-                history.pushState(stateObj, '', selectedRoute.data.url.pathname);
+                history.pushState(stateObj, '', selectedNodeRoute.url.pathname);
             }else{
                 let stateObj = { path : location.pathname };
                 // route the user to not found view
@@ -103,40 +219,29 @@ Router.prototype.watch = function(){
                 document.body.innerHTML = `<h2>Page not found</h2><h3>404</h3>`
             }
         }
-    });
-}
-
-/**
- * For the back button of the brawsor's window
- */
-window.addEventListener('popstate', function(e){
-    if(e.state){
-        // find the route
-        let backRoute = route.getRoute(e.state.path);
-        // fetch and call the action 
-        Router.fetchRoute(backRoute);
-    }else{
-        // back to the original when state is null
-        //console.log(event.state);
-        console.log(history);
     }
-})
 
-/**
- * Debugger
- */
-Router.prototype.routeList = function(){
+    function backInHistory(){
+        if(e.state){
+            let backRoute = router.getRoute(e.state.path);
+            // fetch and call the action 
+            router.fetchRoute(backRoute);
+        }
+    }
+
+    /**
+     * Debugger
+     */
+    Router.prototype.routeList = function(){
+        return {
+        routes : this.subscribedRoutes
+        }
+    }
+
     return {
-       routes : this.subscribedRoutes
-    }
-}
-// display content to the page
-function render(content){
-    let layout = document.getElementById('app-content');
-    layout.innerHTML = content;
-}
+        get : router.get.bind(router),
+        routeList : router.routeList.bind(router),
 
-// satrt watching route events
-window.onload = function(){
-    route.watch();
-}
+    }
+
+ })();

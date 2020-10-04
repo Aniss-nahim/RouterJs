@@ -1,10 +1,16 @@
 
-// import route from 'router';
+// import Router from 'Routerr';
 
-route.get('/about', function(res) { render(res); });
+ // display content to the page
+ function render(content){
+    let layout = document.getElementById('app-content');
+    layout.innerHTML = content;
+}
 
-route.get('/home', function(res) { render(res); });
 
-route.get('/foo', function(res) { render(res); });
+Router.get('/about', function(res) { render(res); });
 
-console.log(route);
+Router.get('/home', function(res) { render(res); });
+
+Router.get('/foo', function(res) { render(res); });
+
