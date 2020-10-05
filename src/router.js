@@ -9,6 +9,7 @@
  * all to make SPA more easy to build
  *****************************************************/
 'use-strict';
+
 const Router = (function(){
    
     /**********************************************************
@@ -27,8 +28,7 @@ const Router = (function(){
         this.url = new URL(url);
         this.methods = {};
         if(typeof method === 'string' && method !== ''){
-            this.methods[method] = action;   
-            console.log(method);
+            this.methods[method] = action;
         }
     }
 
@@ -73,30 +73,33 @@ const Router = (function(){
 
     /**
      * Register new NodeRoute
-     * @param {Route} route - data route object
+     * @param {NodeRoute} nodeRoute - data route object
      */
-    Tree.prototype.register = function ( route ){
+    Tree.prototype.register = function ( nodeRoute ){
         // get the steps from the URL pathname
-        let steps = this.splitPath(route.url.pathname);
-        let shiftedSteps = '';
+        let steps = this.splitPath(nodeRoute.url.pathname);
         // set the stating node
         let currentNode = this.root;
         // while the node exists we move forward
         while(currentNode.children.has(steps[0])){
             currentNode = currentNode.children.get(steps[0]);
-            shiftedSteps = '/' + steps.shift();
+            steps.shift();
         }
         // if we still have steps then
         if(steps.length){
+            let pathName = '';
             // Loop through the remaning steps and create nodeRoutes with undefined route
-            steps.forEach(function(step){
-                shiftedSteps = '/' + steps.shift();
-                // create and add node with null data 
-                let newNode = new NodeRoute(this.host+shiftedSteps);
-                currentNode.children.set(step,newNode);
+            for(let index in steps){
+                pathName = '/'+steps[index];
+                // create and add nodeRoure without method and action 
+                let newNode = new NodeRoute(router.host+pathName);
+                currentNode.children.set(steps[index],newNode);
                 currentNode = newNode;
-            });
-            currentNode.route = route;
+            }
+        }
+        // last NodeRoute should define the method and action
+        for(let key in nodeRoute.methods){
+            currentNode.methods[key] = nodeRoute.methods[key];
         }
     }
 
@@ -109,7 +112,7 @@ const Router = (function(){
         // strating node
         let currentNode = this.root;
         // Array steps
-        let steps = Tree.splitPath(path);
+        let steps = this.splitPath(path);
         // looping on steps
         for(let index in steps){
             if(!currentNode.children.has(steps[index])){
@@ -118,7 +121,7 @@ const Router = (function(){
             currentNode = currentNode.children.get(steps[index]);
         }
         // node routes with null data are not valide ones
-        return currentNode.method ? currentNode:false;
+        return currentNode.methods ? currentNode:false;
     }
 
     /*----------------------------------------------------------------------------------------------------*/
@@ -132,11 +135,16 @@ const Router = (function(){
     const Router = function(host, rootMethod, rootAction){
         Tree.call(this, host, rootMethod, rootAction);
     }
-    Object.setPrototypeOf(Router, Tree.prototype);
+    Router.prototype = Object.create(Tree.prototype);
+
+    Object.defineProperty(Router.prototype, 'constructor', {
+        value : Router,
+        enumerable : false,
+        writable : true
+    });
 
     // Hold the singleton instance of Router class
-    let router = new Router(location.origin, null, null);
-    console.log(router);
+    let router = new Router(location.origin);
 
     /**
      * Subscribe new route, accessible only with GET method
@@ -145,7 +153,7 @@ const Router = (function(){
      * @param {function} callback
      */
     Router.prototype.get = function (pathName, callback){
-        this.register(new Route(this.host+pathName, 'get', callback));
+        this.register(new NodeRoute(this.host+pathName, 'get', callback));
     }
 
     /**
@@ -162,14 +170,14 @@ const Router = (function(){
      *  Call the action nodeRoute on resolve and display error on reject
      *  @param {NodeRoute} route - nodeRoute Object
      */
-    Router.prototype.fetchRoute = function(nodeRoute, fetchMethod){
+    Router.prototype.fetchRoute = function(nodeRoute, fetchMethod = 'get'){
         // Set the url we want to fectch
         // This instruction is hard coded and it will be removed 
         const urlToFetch = nodeRoute.url.origin+'/src/pages'+nodeRoute.url.pathname+'.html';
         // check if the nodeRoute support the method
         if(typeof nodeRoute.methods[fetchMethod] === 'function'){
             // send the appropriate request to the server  using the appropriate method
-            http[nodeRoute.methods[fetchMethod]](urlToFetch)
+            http[fetchMethod](urlToFetch)
             .then(response => response.text())
             .then(content => { 
                 // call the appropriate action when content is recived
@@ -199,11 +207,10 @@ const Router = (function(){
     // these two function hundl the app state and history
     function changeRoute(event){
         event.preventDefault();
-        if(e.target.getAttribute('route')){
+        if(event.target.getAttribute('route')){
 
-            const selectedPath = e.target.getAttribute('route');
+            const selectedPath = event.target.getAttribute('route');
             const selectedNodeRoute = router.getRoute(selectedPath);
-
             if(selectedNodeRoute){
                 // fetch route and returns response
                 router.fetchRoute(selectedNodeRoute);
@@ -221,7 +228,7 @@ const Router = (function(){
         }
     }
 
-    function backInHistory(){
+    function backInHistory(e){
         if(e.state){
             let backRoute = router.getRoute(e.state.path);
             // fetch and call the action 

@@ -1,0 +1,41 @@
+body{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #222;
+    color: white;
+}
+
+#app{
+    height: 100vh;
+    padding: 1rem;
+}
+
+#app-content{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.btn{
+    padding: .5rem;
+    font-size: medium;
+    -webkit-box-shadow: 0px 0px 2px 0.3px rgba(204,204,204,1);
+    -moz-box-shadow: 0px 0px 2px 0.3px rgba(204,204,204,1);
+    box-shadow: 0px 0px 2px 0.3px rgba(204,204,204,1);
+    border-radius: 5px;
+    border: none;
+}
+
+.white{
+    background-color: white;
+}
+
+.navigatore{
+    margin: 5rem auto;
+    width: 50%;
+    display: flex;
+    justify-content: space-around;
+}
